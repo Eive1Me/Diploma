@@ -1,3 +1,13 @@
 <resources>
     <string name="app_name">Diploma</string>
+    <string name="about">
+	    Task is android time manager for people, who wants to control work time.\n\n
+	    This program is free and open source. It is licensed under the GNU GPL v3. \n\n
+	    Version: 1.0\n
+	    You can download the code of this program from: \n https://github.com/Eive1Me/Diploma/
+	    \n\nAuthor: Eive1Me
+	    \nE-mail: evangelzm@gmail.com
+    </string>
+	<dimen name="title_size">32sp</dimen>
+	<dimen name="support_text_size">16sp</dimen>
 </resources>
