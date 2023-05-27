@@ -8,6 +8,8 @@
 	    \n\nAuthor: Eive1Me
 	    \nE-mail: evangelzm@gmail.com
     </string>
+	<string name="DefautMonth">Month day</string>
+	<string name="DefaultWeekday">Week day</string>
 	<dimen name="title_size">32sp</dimen>
 	<dimen name="support_text_size">16sp</dimen>
 </resources>
