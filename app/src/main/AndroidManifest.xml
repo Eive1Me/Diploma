@@ -14,7 +14,14 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Diploma"
+        android:usesCleartextTraffic="true"
         tools:targetApi="31">
+        <activity
+            android:name=".LogIn"
+            android:exported="false" />
+        <activity
+            android:name=".TaskUpdate"
+            android:exported="false"/>
         <activity
             android:name=".MainActivity"
             android:exported="true">

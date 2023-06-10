@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_groups"
+            android:title="@string/menu_Profile"/>
+        <item
+            android:id="@+id/nav_shuffle"
+            android:title="@string/menu_Shuffle"/>
+    </group>
+
+    <item
+        android:id="@+id/accounts"
+        android:title="@string/accounts"
+        android:visible="false">
+        <menu
+            android:id="@+id/account_item_list">
+
+        </menu>
+    </item>
+
+    <item android:title="@string/account">
+        <menu>
+            <item
+                android:id="@+id/nav_login"
+                android:title="@string/menu_Login"/>
+            <item
+                android:id="@+id/nav_logout"
+                android:title="@string/menu_logout"
+                android:visible="false"/>
+        </menu>
+    </item>
+
+</menu>

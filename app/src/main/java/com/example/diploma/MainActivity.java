@@ -3,18 +3,53 @@ package com.example.diploma;
 import static com.kizitonwose.calendar.core.ExtensionsKt.daysOfWeek;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.coordinatorlayout.widget.CoordinatorLayout;
+import androidx.drawerlayout.widget.DrawerLayout;
 
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import android.content.Intent;
+import android.database.sqlite.SQLiteConstraintException;
+import android.database.sqlite.SQLiteException;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Point;
+import android.graphics.RectF;
+import android.graphics.SweepGradient;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ClipDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
+import android.graphics.drawable.ShapeDrawable;
+import android.graphics.drawable.shapes.ArcShape;
+import android.graphics.drawable.shapes.OvalShape;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.view.Display;
+import android.view.Gravity;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.example.diploma.local_database.DatabaseAdapter;
+import com.example.diploma.model.Task;
+import com.example.diploma.model.User;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.navigation.NavigationView;
 import com.kizitonwose.calendar.core.CalendarDay;
 import com.kizitonwose.calendar.core.CalendarMonth;
 import com.kizitonwose.calendar.core.DayPosition;
@@ -29,12 +64,32 @@ import com.kizitonwose.calendar.view.WeekCalendarView;
 import com.kizitonwose.calendar.view.WeekDayBinder;
 import com.kizitonwose.calendar.view.WeekHeaderFooterBinder;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.sql.SQLException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.TextStyle;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -43,19 +98,71 @@ public class MainActivity extends AppCompatActivity {
     WeekCalendarView weekCalendarView = null;
     TextView month_day = null;
     TextView week_day = null;
+    ListView taskViewList = null;
+    TaskAdapter taskAdapter = null;
     FrameLayout flBottomSheet = null;
+    List<Task> taskList = new ArrayList<>();
+    DatabaseAdapter adapter = null;
+    Button addTask = null;
+    DrawerLayout drawerLayout;
+    NavigationView navigationView;
+
+    User currentUser = new User();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        drawerLayout = findViewById(R.id.drawer_layout);
+        navigationView = findViewById(R.id.navigation_view);
         weekCalendarView = findViewById(R.id.weekCalendarView);
         monthCalendarView = findViewById(R.id.calendarView);
         month_day = findViewById(R.id.month_day);
         week_day = findViewById(R.id.week_day);
         flBottomSheet = findViewById(R.id.standard_bottom_sheet);
+        taskViewList = findViewById(R.id.taskList);
+        addTask = findViewById(R.id.add_task);
         List<DayOfWeek> dayOfWeeks = daysOfWeek(DayOfWeek.MONDAY);
+        int selectionDrawable = R.drawable.baseline_brightness_1_24;
+
+        FileInputStream fin = null;
+        try {
+            fin = openFileInput("1.txt");
+            byte[] bytes = new byte[fin.available()];
+            fin.read(bytes);
+            String[] text = (new String (bytes)).split(":");
+            if (text.length == 3)
+                currentUser = new User(Long.getLong(text[0]), text[1], text[2]);
+        }
+        catch(IOException ex) {
+            Toast.makeText(this, "Пожалуйста, войдите в систему.", Toast.LENGTH_SHORT).show();
+        }
+        finally{
+            if(fin!=null) {
+                try {
+                    fin.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        adapter = new DatabaseAdapter(this);
+        adapter.open();
+        try {
+            taskList = adapter.getAllTasks();
+            List<Task> newList = new ArrayList<>();
+            for (Task task : taskList) {
+                if (task.getUserId().getId() != currentUser.getId()) {
+                    adapter.deleteTask(task.getId());
+                } else {
+                    newList.add(task);
+                }
+            }
+            taskList = newList;
+        } catch (SQLiteException ignored) {}
+        adapter.close();
 
         /* Day number binder */
         MonthDayBinder<DayViewContainer> monthDayBinder = new MonthDayBinder<DayViewContainer>() {
@@ -70,14 +177,67 @@ public class MainActivity extends AppCompatActivity {
                 container.day = calendarDay;
                 container.setOnClickListener(monthCalendarView);
                 container.textView.setText(String.valueOf(calendarDay.getDate().getDayOfMonth()));
+
+                // Проверяем, есть ли задачи на выбранную дату
+                LocalDate date = calendarDay.getDate();
+                List<Task> tasks = getTasksForDate(date);
+
                 if (calendarDay.getPosition() == DayPosition.MonthDate) {
                     if (calendarDay.getDate().equals(selectedDate)) {
+                        taskAdapter = new TaskAdapter(MainActivity.this, R.layout.list_layout, tasks);
+                        taskViewList.setAdapter(taskAdapter);
                         container.textView.setTextColor(Color.WHITE);
-                        container.textView.setBackgroundResource(R.drawable.ic_launcher_background);
+                        container.textView.setBackgroundResource(selectionDrawable);
                     } else {
                         container.textView.setTextColor(Color.BLACK);
                         container.textView.setBackgroundResource(0);
                     }
+                }
+                if (!tasks.isEmpty()) {
+                    Map<Color, Integer> colormap = new HashMap<>();
+                    for (Task task : tasks) {
+                        Color taskColor = Color.valueOf(Color.parseColor(task.getCategoryId().getColour()));
+                        if (!colormap.containsKey(taskColor))
+                            colormap.put(taskColor, 1);
+                        else
+                            colormap.put(taskColor, colormap.get(taskColor) + 1);
+                    }
+
+                    int totalPercentage = 0; // Общий процент, чтобы вычислить оставшийся цвет
+                    for (int percentage : colormap.values()) {
+                        totalPercentage += percentage;
+                    }
+
+                    float startAngle = 0;
+                    int width = 50; // Ширина окружности
+                    int height = 50; // Высота окружности
+
+                    Bitmap bitmap = Bitmap.createBitmap(width + 8, height + 8, Bitmap.Config.ARGB_8888);
+                    Canvas canvas = new Canvas(bitmap);
+
+                    RectF rectF = new RectF(8, 8, width, height);
+                    for (int i = 0; i < colormap.values().size(); i++) {
+                        int percentage = colormap.values().toArray(new Integer[]{})[i];
+                        int color = colormap.keySet().toArray(new Color[]{})[i].toArgb();
+                        float sweepAngle = (float) percentage / totalPercentage * 360;
+
+                        Paint paint = new Paint();
+                        paint.setAntiAlias(true);
+                        paint.setStyle(Paint.Style.STROKE);
+                        paint.setStrokeWidth(6);
+                        paint.setColor(color);
+
+                        canvas.drawArc(rectF, startAngle, sweepAngle, false, paint);
+
+                        startAngle += sweepAngle;
+                    }
+
+                    Drawable drawable = new BitmapDrawable(container.progressCircle.getResources(), bitmap);
+                    drawable.setAlpha(180);
+                    container.progressCircle.setBackground(drawable);
+                } else {
+                    // Если задач нет, убираем фоновый рисунок
+                    container.progressCircle.setBackgroundResource(0);
                 }
             }
         };
@@ -96,11 +256,60 @@ public class MainActivity extends AppCompatActivity {
                 if (weekDay.getPosition() == WeekDayPosition.RangeDate) {
                     if (weekDay.getDate().equals(selectedDate)) {
                         container.textView.setTextColor(Color.WHITE);
-                        container.textView.setBackgroundResource(R.drawable.ic_launcher_background);
+                        container.textView.setBackgroundResource(selectionDrawable);
                     } else {
                         container.textView.setTextColor(Color.BLACK);
                         container.textView.setBackgroundResource(0);
                     }
+                }
+                // Проверяем, есть ли задачи на выбранную дату
+                LocalDate date = weekDay.getDate();
+                List<Task> tasks = getTasksForDate(date);
+                if (!tasks.isEmpty()) {
+                    Map<Color, Integer> colormap = new HashMap<>();
+                    for (Task task : tasks) {
+                        Color taskColor = Color.valueOf(Color.parseColor(task.getCategoryId().getColour()));
+                        if (!colormap.containsKey(taskColor))
+                            colormap.put(taskColor, 1);
+                        else
+                            colormap.put(taskColor, colormap.get(taskColor) + 1);
+                    }
+
+                    int totalPercentage = 0; // Общий процент, чтобы вычислить оставшийся цвет
+                    for (int percentage : colormap.values()) {
+                        totalPercentage += percentage;
+                    }
+
+                    float startAngle = 0;
+                    int width = 50; // Ширина окружности
+                    int height = 50; // Высота окружности
+
+                    Bitmap bitmap = Bitmap.createBitmap(width + 8, height + 8, Bitmap.Config.ARGB_8888);
+                    Canvas canvas = new Canvas(bitmap);
+
+                    RectF rectF = new RectF(8, 8, width, height);
+                    for (int i = 0; i < colormap.values().size(); i++) {
+                        int percentage = colormap.values().toArray(new Integer[]{})[i];
+                        int color = colormap.keySet().toArray(new Color[]{})[i].toArgb();
+                        float sweepAngle = (float) percentage / totalPercentage * 360;
+
+                        Paint paint = new Paint();
+                        paint.setAntiAlias(true);
+                        paint.setStyle(Paint.Style.STROKE);
+                        paint.setStrokeWidth(6);
+                        paint.setColor(color);
+
+                        canvas.drawArc(rectF, startAngle, sweepAngle, false, paint);
+
+                        startAngle += sweepAngle;
+                    }
+
+                    Drawable drawable = new BitmapDrawable(container.progressCircle.getResources(), bitmap);
+                    drawable.setAlpha(180);
+                    container.progressCircle.setBackground(drawable);
+                } else {
+                    // Если задач нет, убираем фоновый рисунок
+                    container.progressCircle.setBackgroundResource(0);
                 }
             }
         };
@@ -197,8 +406,8 @@ public class MainActivity extends AppCompatActivity {
                 float weekCalendarViewAlpha = slideOffset;
 
                 // Меняем прозрачность пропорционально slideOffset и положению представлений
-                calendarViewAlpha *= calculateAlpha(monthCalendarView.getTop(), maxHeight);
-                weekCalendarViewAlpha *= calculateAlpha(weekCalendarView.getTop(), maxHeight);
+                calendarViewAlpha *= Utils.calculateAlpha(monthCalendarView.getTop(), maxHeight);
+                weekCalendarViewAlpha *= Utils.calculateAlpha(weekCalendarView.getTop(), maxHeight);
 
                 // Создаем аниматоры для альфа-канала представлений
                 ObjectAnimator calendarViewAnimator = ObjectAnimator.ofFloat(monthCalendarView, "alpha", calendarViewAlpha);
@@ -212,15 +421,90 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        WindowManager windowManager = getWindowManager();
+        Display display = windowManager.getDefaultDisplay();
+        Point screenSize = new Point();
+        display.getSize(screenSize);
+        int screenHeight = screenSize.y;
+        ViewTreeObserver monthCalendarViewObserver = monthCalendarView.getViewTreeObserver();
+        monthCalendarViewObserver.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                CoordinatorLayout.LayoutParams layoutParams = (CoordinatorLayout.LayoutParams) flBottomSheet.getLayoutParams();
+                int monthCalendarHeight = monthCalendarView.getHeight();
+                BottomSheetBehavior<FrameLayout> bottomSheetBehavior = BottomSheetBehavior.from(flBottomSheet);
+                bottomSheetBehavior.setPeekHeight(screenHeight - monthCalendarHeight - findViewById(R.id.titlesContainer).getHeight() - 8);
+                layoutParams.setBehavior(bottomSheetBehavior);
+                flBottomSheet.setLayoutParams(layoutParams);
+                monthCalendarView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+            }
+        });
+
+        ViewTreeObserver weekCalendarViewObserver = weekCalendarView.getViewTreeObserver();
+        weekCalendarViewObserver.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                CoordinatorLayout.LayoutParams layoutParams = (CoordinatorLayout.LayoutParams) flBottomSheet.getLayoutParams();
+                int weekCalendarHeight = weekCalendarView.getHeight();
+                layoutParams.height = screenHeight - weekCalendarHeight - findViewById(R.id.titlesContainer).getHeight() - 8;
+                flBottomSheet.setLayoutParams(layoutParams);
+                weekCalendarView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+            }
+        });
+
         selectedDate = LocalDate.now();
         monthCalendarView.notifyDateChanged(selectedDate);
-        month_day.setText(prettyDate(selectedDate));
+        month_day.setText(Utils.prettyDate(selectedDate));
         week_day.setText(selectedDate.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
+
+        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawerLayout, 0, 0);
+        drawerLayout.addDrawerListener(toggle);
+        toggle.syncState();
+
+        // Добавьте обработчик кликов по элементам меню
+        navigationView.setNavigationItemSelectedListener(item -> {
+            // Обработка выбора пунктов меню здесь
+            // Можно добавить свою логику для каждого пункта меню
+            if (item.getTitle().equals("Log in")){
+                Intent intent = new Intent(MainActivity.this, LogIn.class);
+                startActivity(intent);
+            } else if (item.getTitle().equals("Rearrange tasks")) {
+                taskList.forEach(task -> {
+                    if (task.getId() == 16) {
+                        task.setPlannedTime(Date.from(task.getPlannedTime().toInstant().plus(1, ChronoUnit.DAYS)));
+                        monthCalendarView.updateMonthData();
+                        weekCalendarView.updateWeekData();
+                    }
+                } );
+            } else if (item.getTitle().equals("Profile")) {
+
+            }
+            drawerLayout.closeDrawers();
+            return true;
+        });
+
+        Bundle arguments = getIntent().getExtras();
+        try {
+            Long userId = arguments.getLong("UserId");
+            currentUser.setId(userId);
+        } catch (NullPointerException ignored){}
+    }
+
+    public void addTask(View view) {
+        Intent intent = new Intent(MainActivity.this, TaskUpdate.class);
+        startActivity(intent);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
+        if (currentUser.getId() > 0)
+            try {
+                System.out.println(1);
+                new GetDataFromURL().execute("http://192.168.3.7:8080/antiprocrastinate-api/v1/tasks/all/" + currentUser.getId());
+            } catch (NullPointerException ignored){}
+        monthCalendarView.updateMonthData();
+        weekCalendarView.updateWeekData();
     }
 
     static class MonthViewContainer extends ViewContainer {
@@ -235,12 +519,14 @@ public class MainActivity extends AppCompatActivity {
     class WeekDayViewContainer extends ViewContainer {
         View view;
         TextView textView;
+        ImageView progressCircle;
         WeekDay day;
 
         public WeekDayViewContainer(@NonNull View view) {
             super(view);
             this.view = view;
             textView = view.findViewById(R.id.calendarDayText);
+            progressCircle = view.findViewById(R.id.progress_circle);
         }
 
         public void setOnClickListener(WeekCalendarView weekCalendarView) {
@@ -251,14 +537,14 @@ public class MainActivity extends AppCompatActivity {
                         monthCalendarView.notifyDateChanged(currentSelection);
                         weekCalendarView.notifyDateChanged(currentSelection);
                         selectedDate = LocalDate.now();
-                        month_day.setText(prettyDate(currentSelection));
+                        month_day.setText(Utils.prettyDate(currentSelection));
                         week_day.setText(currentSelection.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
                         monthCalendarView.notifyDateChanged(currentSelection);
                         weekCalendarView.notifyDateChanged(currentSelection);
                     } else {
                         selectedDate = day.getDate();
-                        month_day.setText(prettyDate(selectedDate));
-                        week_day.setText(currentSelection.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
+                        month_day.setText(Utils.prettyDate(selectedDate));
+                        week_day.setText(selectedDate.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
                         monthCalendarView.notifyDateChanged(selectedDate);
                         weekCalendarView.notifyDateChanged(selectedDate);
                         if (currentSelection != null) {
@@ -274,12 +560,14 @@ public class MainActivity extends AppCompatActivity {
     class DayViewContainer extends ViewContainer {
         View view;
         TextView textView;
+        ImageView progressCircle;
         CalendarDay day;
 
         public DayViewContainer(@NonNull View view) {
             super(view);
             this.view = view;
             textView = view.findViewById(R.id.calendarDayText);
+            progressCircle = view.findViewById(R.id.progress_circle);
         }
 
         public void setOnClickListener(CalendarView monthCalendarView) {
@@ -290,14 +578,14 @@ public class MainActivity extends AppCompatActivity {
                         monthCalendarView.notifyDateChanged(currentSelection);
                         weekCalendarView.notifyDateChanged(currentSelection);
                         selectedDate = LocalDate.now();
-                        month_day.setText(prettyDate(currentSelection));
+                        month_day.setText(Utils.prettyDate(currentSelection));
                         week_day.setText(currentSelection.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
                         monthCalendarView.notifyDateChanged(currentSelection);
                         weekCalendarView.notifyDateChanged(currentSelection);
                     } else {
                         selectedDate = day.getDate();
-                        month_day.setText(prettyDate(selectedDate));
-                        week_day.setText(currentSelection.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
+                        month_day.setText(Utils.prettyDate(selectedDate));
+                        week_day.setText(selectedDate.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
                         monthCalendarView.notifyDateChanged(selectedDate);
                         weekCalendarView.notifyDateChanged(selectedDate);
                         if (currentSelection != null) {
@@ -310,13 +598,116 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public String prettyDate(LocalDate date){
-        return date.getDayOfMonth() + " " + date.getMonth().getDisplayName(TextStyle.FULL, Locale.getDefault());
+    private List<Task> getTasksForDate(LocalDate date) {
+        List<Task> tasksForDate = new ArrayList<>();
+        for (Task task : taskList) {
+            Date date1 = Date.from(date.atStartOfDay(ZoneId.systemDefault()).toInstant());
+            if (task.getPlannedTime().getYear() == date1.getYear() &&
+                task.getPlannedTime().getMonth() == date1.getMonth() &&
+                task.getPlannedTime().getDate() == date1.getDate()
+            ){
+                tasksForDate.add(task);
+            }
+        }
+        return tasksForDate;
     }
 
-    private float calculateAlpha(int viewTop, int maxHeight) {
-        // В этом примере, я просто использую линейную интерполяцию, чтобы прозрачность изменялась равномерно в зависимости от положения представления.
-        float alphaPercentage = (float) viewTop / maxHeight;
-        return 1f - alphaPercentage; // Инвертируем значение, чтобы прозрачность увеличивалась с движением вверх.
+    private class GetDataFromURL extends AsyncTask<String, String, String> {
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
+
+        @Override
+        protected String doInBackground(String... strings) {
+            HttpURLConnection connection = null;
+            BufferedReader reader = null;
+
+            try {
+                URL url = new URL(strings[0]);
+                connection = (HttpURLConnection) url.openConnection();
+                connection.connect();
+
+                InputStream stream = connection.getInputStream();
+                reader = new BufferedReader(new InputStreamReader(stream));
+
+                StringBuilder buffer = new StringBuilder();
+                String line = "";
+
+                while ((line = reader.readLine()) != null) {
+                    buffer.append(line).append("\n");
+                }
+                return buffer.toString();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                if (connection != null)
+                    connection.disconnect();
+                try {
+                    if (reader != null) {
+                        reader.close();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+            try {
+                taskList.clear();
+                adapter.open();
+                JSONArray array = new JSONArray(result);
+                for (int i = 0; i < array.length(); i++) {
+                    JSONObject jsonTask = array.getJSONObject(i);
+                    if (currentUser.getLogin() == null){
+                        currentUser = Utils.parseUserJsonObject(jsonTask.getJSONObject("userId"));
+                    }
+                    Task task = Utils.parseTaskJsonObject(jsonTask);
+                    if (!taskList.contains(task)){
+                        taskList.add(task);
+                        try {
+                            adapter.addTask(task);
+                        } catch (SQLiteConstraintException ignored) {}
+                    }
+                }
+                weekCalendarView.updateWeekData();
+                monthCalendarView.updateMonthData();
+
+                FileOutputStream fos = null;
+                try {
+                    String text = currentUser.getId() + ":" + currentUser.getLogin() + ":" + currentUser.getPassword();
+                    fos = openFileOutput("profile.txt", MODE_PRIVATE);
+                    fos.write(text.getBytes());
+                }
+                catch(IOException ex) {
+                    Toast.makeText(MainActivity.this, ex.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+                finally{
+                    try{
+                        if(fos!=null)
+                            fos.close();
+                    }
+                    catch(IOException ex){
+                        Toast.makeText(MainActivity.this, ex.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                }
+
+                for (Task task :
+                        taskList) {
+                    if (task.getUserId().getId() != currentUser.getId()) {
+                        adapter.deleteTask(task.getId());
+                    }
+                }
+                monthCalendarView.updateMonthData();
+                weekCalendarView.updateWeekData();
+                adapter.close();
+            } catch (JSONException | NullPointerException e) {
+                e.printStackTrace();
+            }
+        }
     }
+
 }
