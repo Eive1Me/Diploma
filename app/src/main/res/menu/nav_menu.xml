@@ -10,25 +10,16 @@
             android:title="@string/menu_Shuffle"/>
     </group>
 
-    <item
-        android:id="@+id/accounts"
-        android:title="@string/accounts"
-        android:visible="false">
-        <menu
-            android:id="@+id/account_item_list">
-
-        </menu>
-    </item>
-
     <item android:title="@string/account">
         <menu>
             <item
                 android:id="@+id/nav_login"
-                android:title="@string/menu_Login"/>
+                android:title="@string/menu_Login"
+                android:visible="true"/>
             <item
                 android:id="@+id/nav_logout"
                 android:title="@string/menu_logout"
-                android:visible="false"/>
+                android:visible="true"/>
         </menu>
     </item>
 

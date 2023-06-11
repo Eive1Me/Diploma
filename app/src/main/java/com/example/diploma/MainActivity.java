@@ -30,8 +30,10 @@ import android.graphics.drawable.shapes.ArcShape;
 import android.graphics.drawable.shapes.OvalShape;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.Display;
 import android.view.Gravity;
+import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
@@ -91,6 +93,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -108,6 +111,7 @@ public class MainActivity extends AppCompatActivity {
     DrawerLayout drawerLayout;
     NavigationView navigationView;
     User currentUser = new User();
+    ActionBarDrawerToggle toggle;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -163,6 +167,24 @@ public class MainActivity extends AppCompatActivity {
             taskList = newList;
         } catch (SQLiteException ignored) {}
         adapter.close();
+
+        Bundle arguments = getIntent().getExtras();
+        try {
+            Long userId = arguments.getLong("UserId");
+            currentUser.setId(userId);
+        } catch (NullPointerException ignored){}
+
+        if (currentUser != null && currentUser.getLogin() != null && !currentUser.getLogin().isEmpty()){
+            TextView textView = navigationView.getHeaderView(0).findViewById(R.id.header_title);
+            textView.setText(currentUser.getLogin());
+            navigationView.getMenu().findItem(R.id.nav_login).setVisible(false);
+            navigationView.getMenu().findItem(R.id.nav_logout).setVisible(true);
+        } else {
+            TextView textView = navigationView.getHeaderView(0).findViewById(R.id.header_title);
+            textView.setText("Offline");
+            navigationView.getMenu().findItem(R.id.nav_login).setVisible(true);
+            navigationView.getMenu().findItem(R.id.nav_logout).setVisible(false);
+        }
 
         /* Day number binder */
         MonthDayBinder<DayViewContainer> monthDayBinder = new MonthDayBinder<DayViewContainer>() {
@@ -457,10 +479,6 @@ public class MainActivity extends AppCompatActivity {
         month_day.setText(Utils.prettyDate(selectedDate));
         week_day.setText(selectedDate.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
 
-        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawerLayout, 0, 0);
-        drawerLayout.addDrawerListener(toggle);
-        toggle.syncState();
-
         // Добавьте обработчик кликов по элементам меню
         navigationView.setNavigationItemSelectedListener(item -> {
             // Обработка выбора пунктов меню здесь
@@ -468,29 +486,64 @@ public class MainActivity extends AppCompatActivity {
             if (item.getTitle().equals("Log in")){
                 Intent intent = new Intent(MainActivity.this, LogIn.class);
                 startActivity(intent);
+            } else if (item.getTitle().equals("Log out")) {
+
+                TextView textView = navigationView.getHeaderView(0).findViewById(R.id.header_title);
+                textView.setText("Offline");
+
+                Handler handler = new Handler();
+                handler.postDelayed(() -> {
+                    MenuItem navLogoutItem = navigationView.getMenu().findItem(R.id.nav_logout);
+                    navLogoutItem.setVisible(false);
+                    MenuItem navLoginItem = navigationView.getMenu().findItem(R.id.nav_login);
+                    navLoginItem.setVisible(true);
+                }, 100); // Задержка в миллисекундах (в данном случае 100 миллисекунд)
+
+                taskList.clear();
+                taskAdapter.notifyDataSetChanged();
+                currentUser = new User();
+
+                FileOutputStream fos = null;
+                try {
+                    String text = "Это строка существует просто чтобы выдало ошибку парсинга, а Вы почему вообще её читаете?";
+                    fos = openFileOutput("profile.txt", MODE_PRIVATE);
+                    fos.write(text.getBytes());
+                }
+                catch(IOException ignored) {}
+                finally{
+                    try{
+                        if(fos!=null)
+                            fos.close();
+                    }
+                    catch(IOException ignored){}
+                }
+
             } else if (item.getTitle().equals("Rearrange tasks")) {
                 taskList.forEach(task -> {
                     if (task.getId() == 16) {
                         task.setPlannedTime(Date.from(task.getPlannedTime().toInstant().plus(1, ChronoUnit.DAYS)));
-                        monthCalendarView.updateMonthData();
-                        weekCalendarView.updateWeekData();
                     }
                 } );
             } else if (item.getTitle().equals("Profile")) {
-                Intent intent = new Intent(MainActivity.this, ProfileActivity.class);
-                intent.putExtra("UserName", currentUser.getLogin());
-                intent.putExtra("UserId", currentUser.getId());
-                startActivity(intent);
+                if (currentUser != null && currentUser.getId() > 0) {
+                    Intent intent = new Intent(MainActivity.this, ProfileActivity.class);
+                    intent.putExtra("UserName", currentUser.getLogin());
+                    intent.putExtra("UserId", currentUser.getId());
+                    startActivity(intent);
+                } else {
+                    Toast.makeText(this, "Пожалуйста, войдите в систему.", Toast.LENGTH_SHORT).show();
+                }
             }
+            monthCalendarView.updateMonthData();
+            weekCalendarView.updateWeekData();
             drawerLayout.closeDrawers();
             return true;
         });
 
-        Bundle arguments = getIntent().getExtras();
-        try {
-            Long userId = arguments.getLong("UserId");
-            currentUser.setId(userId);
-        } catch (NullPointerException ignored){}
+        toggle = new ActionBarDrawerToggle(this, drawerLayout, 0, 0);
+        drawerLayout.addDrawerListener(toggle);
+        toggle.syncState();
+
     }
 
     public void addTask(View view) {
@@ -501,12 +554,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        if (currentUser.getId() > 0)
-            try {
+        try {
+            if (currentUser != null && currentUser.getId() > 0)
                 new GetDataFromURL().execute("http://192.168.3.7:8080/antiprocrastinate-api/v1/tasks/all/" + currentUser.getId());
-            } catch (NullPointerException ignored){}
-        monthCalendarView.updateMonthData();
-        weekCalendarView.updateWeekData();
+        } catch (NullPointerException ignored){}
+
     }
 
     static class MonthViewContainer extends ViewContainer {
