@@ -46,8 +46,12 @@ public class Utils {
             task.setPlannedTime(parseStringToDate(jsonTask.getString("plannedTime")));
             task.setDeadlineTime(parseStringToDate(jsonTask.getString("deadlineTime")));
             task.setDesc(jsonTask.getString("desc"));
-            JSONObject jsonGroup = jsonTask.getJSONObject("groupId");
-            task.setGroupId(parseGroupJsonObject(jsonGroup));
+            try {
+                JSONObject jsonGroup = jsonTask.getJSONObject("groupId");
+                task.setGroupId(parseGroupJsonObject(jsonGroup));
+            } catch (JSONException ignored) {
+                task.setGroupId(null);
+            }
             JSONObject jsonStatus = jsonTask.getJSONObject("statusId");
             task.setStatusId(new com.example.diploma.model.Status(jsonStatus.getLong("id"), jsonStatus.getString("value")));
             task.setCompleteTime(parseStringToDate(jsonTask.getString("completeTime")));
@@ -68,11 +72,12 @@ public class Utils {
     }
 
     public static Group parseGroupJsonObject(JSONObject jsonGroup) {
-        Group group = new Group();
+        Group group;
         try {
             group = new Group(jsonGroup.getLong("id"), jsonGroup.getString("name"), parseUserJsonObject(jsonGroup.getJSONObject("userId")));
         } catch (JSONException e) {
             e.printStackTrace();
+            return null;
         }
         return group;
     }

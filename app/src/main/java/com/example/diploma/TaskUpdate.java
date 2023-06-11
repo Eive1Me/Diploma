@@ -1,6 +1,7 @@
 package com.example.diploma;
 
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
@@ -17,7 +18,12 @@ import com.example.diploma.model.User;
 import com.github.florent37.singledateandtimepicker.dialog.DoubleDateAndTimePickerDialog;
 import com.github.florent37.singledateandtimepicker.dialog.SingleDateAndTimePickerDialog;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -37,9 +43,14 @@ public class TaskUpdate extends AppCompatActivity {
     private Button delButton;
     private Button saveButton;
     private Spinner prioritySpinner;
+    private Spinner categorySpinner;
+    private Spinner statusSpinner;
     private LocalDate selectedDeadlineDate = LocalDate.now();
     private LocalDate selectedPlannedDate = LocalDate.now();
     String selectedPriority = "high";
+    String selectedStatus = "not started";
+    String selectedCategory = "work";
+    private LocalDate completeTime = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,6 +60,8 @@ public class TaskUpdate extends AppCompatActivity {
         selectDeadlineTime = findViewById(R.id.deadline_time_button);
         selectPlannedTime = findViewById(R.id.planned_time_button);
         prioritySpinner = findViewById(R.id.priority_spinner);
+        categorySpinner = findViewById(R.id.category_spinner);
+        statusSpinner = findViewById(R.id.status_spinner);
         delButton = findViewById(R.id.delete_button);
         saveButton = findViewById(R.id.save_button);
 
@@ -71,12 +84,12 @@ public class TaskUpdate extends AppCompatActivity {
         );
 
         // Создаем адаптер для списка вариантов приоритета
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+        ArrayAdapter<CharSequence> priorityAdapter = ArrayAdapter.createFromResource(this,
                 R.array.priority_options, android.R.layout.simple_spinner_item);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        priorityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
         // Применяем адаптер к Spinner
-        prioritySpinner.setAdapter(adapter);
+        prioritySpinner.setAdapter(priorityAdapter);
 
         // Обработка выбранного значения из Spinner
         prioritySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -88,6 +101,40 @@ public class TaskUpdate extends AppCompatActivity {
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
                 // Ничего не делаем
+            }
+        });
+
+        ArrayAdapter<CharSequence> statusAdapter = ArrayAdapter.createFromResource(this,
+                R.array.status_options, android.R.layout.simple_spinner_item);
+        statusAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        statusSpinner.setAdapter(statusAdapter);
+
+        statusSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedCategory = parent.getItemAtPosition(position).toString().toLowerCase(Locale.ROOT);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        ArrayAdapter<CharSequence> categoryAdapter = ArrayAdapter.createFromResource(this,
+                R.array.category_options, android.R.layout.simple_spinner_item);
+        categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        categorySpinner.setAdapter(categoryAdapter);
+
+        categorySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedStatus = parent.getItemAtPosition(position).toString().toLowerCase(Locale.ROOT);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
             }
         });
 
@@ -116,5 +163,36 @@ public class TaskUpdate extends AppCompatActivity {
 //            startActivity(intent);
         });
 
+    }
+
+    private class GetUserAmountFromURL extends AsyncTask<String, String, String> {
+        String name;
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
+
+        @Override
+        protected String doInBackground(String... strings) {
+            name = strings[1];
+            return Utils.backgroundTask(strings);
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+//            try {
+//                List<User> users = new ArrayList<>();
+//                JSONArray array = new JSONArray(result);
+//                for (int i = 0; i < array.length(); i++) {
+//                    JSONObject jsonUser = array.getJSONObject(i);
+//                    User user = Utils.parseUserJsonObject(jsonUser);
+//                    users.add(user);
+//                }
+//                grops.add(new ProfileActivity.Grop(name, users.size()));
+//                groupAdapter.notifyDataSetChanged();
+//            } catch (JSONException | NullPointerException e) {
+//                e.printStackTrace();
+//            }
+        }
     }
 }

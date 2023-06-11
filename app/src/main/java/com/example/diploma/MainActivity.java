@@ -152,6 +152,12 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        Bundle arguments = getIntent().getExtras();
+        try {
+            Long userId = arguments.getLong("UserId");
+            currentUser.setId(userId);
+        } catch (NullPointerException ignored){}
+
         adapter = new DatabaseAdapter(this);
         adapter.open();
         try {
@@ -167,12 +173,6 @@ public class MainActivity extends AppCompatActivity {
             taskList = newList;
         } catch (SQLiteException ignored) {}
         adapter.close();
-
-        Bundle arguments = getIntent().getExtras();
-        try {
-            Long userId = arguments.getLong("UserId");
-            currentUser.setId(userId);
-        } catch (NullPointerException ignored){}
 
         if (currentUser != null && currentUser.getLogin() != null && !currentUser.getLogin().isEmpty()){
             TextView textView = navigationView.getHeaderView(0).findViewById(R.id.header_title);

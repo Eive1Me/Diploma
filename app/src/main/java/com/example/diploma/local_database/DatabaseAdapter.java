@@ -74,13 +74,17 @@ public class DatabaseAdapter {
         values.put("plannedTime", Utils.parseDateToString(task.getPlannedTime())); // Предполагается, что методы getPlannedTime() и getTime() возвращают объект типа Date и его значение в миллисекундах
         values.put("deadlineTime", Utils.parseDateToString(task.getDeadlineTime()));
         values.put("descrip", task.getDesc());
-        values.put("groupId", task.getGroupId().getId());
+        if (task.getGroupId() != null) {
+            values.put("groupId", task.getGroupId().getId());
+        } else {
+            values.put("groupId", (Long) null);
+        }
         values.put("statusId", task.getStatusId().getId());
         values.put("completeTime", Utils.parseDateToString(task.getCompleteTime()));
 
         if (!isUserExists(task.getUserId().getId()))
             addUser(task.getUserId());
-        if (!isGroupExists(task.getGroupId().getId()))
+        if (task.getGroupId() != null && !isGroupExists(task.getGroupId().getId()))
             addGroup(task.getGroupId());
         if (!isCategoryExists(task.getCategoryId().getId()))
             addCategory(task.getCategoryId());
@@ -88,8 +92,13 @@ public class DatabaseAdapter {
             addPriority(task.getPriorityId());
         if (!isStatusExists(task.getStatusId().getId()))
             addStatus(task.getStatusId());
-        if (!isTaskExists(task.getId()))
+        if (!isTaskExists(task.getId())) {
+            System.out.println(task.getName());
             database.insert("TASK_TABLE", null, values);
+        } else {
+            deleteTask(task.getId());
+            database.insert("TASK_TABLE", null, values);
+        }
     }
 
     private boolean isTaskExists(long taskId) {

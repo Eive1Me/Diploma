@@ -40,4 +40,16 @@
         <item>Medium</item>
         <item>Low</item>
     </string-array>
+    <string-array name="status_options">
+        <item>Not started</item>
+        <item>In progress</item>
+        <item>Ready</item>
+    </string-array>
+    <string-array name="category_options">
+        <item>Work</item>
+        <item>School related</item>
+        <item>Housework</item>
+        <item>Steaming</item>
+        <item>Relax</item>
+    </string-array>
 </resources>
