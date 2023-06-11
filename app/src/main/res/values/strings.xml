@@ -10,18 +10,18 @@
 	    \n\nAuthor: Eive1Me
 	    \nE-mail: evangelzm@gmail.com
     </string>
-	<string name="DefautMonth">Month day</string>
-	<string name="DefaultWeekday">Week day</string>
-	<string name="DefaultUser">Offline</string>
-	<string name="account">Account</string>
-	<string name="accounts">Accounts</string>
-	<string name="menu_Profile">Profile</string>
-	<string name="menu_Login">Log in</string>
-	<string name="menu_logout">Log out</string>
-	<string name="menu_Groups">Groups</string>
-	<string name="menu_Shuffle">Rearrange tasks</string>
-	<dimen name="title_size">32sp</dimen>
-	<dimen name="support_text_size">16sp</dimen>
+    <string name="DefautMonth">Month day</string>
+    <string name="DefaultWeekday">Week day</string>
+    <string name="DefaultUser">Offline</string>
+    <string name="account">Account</string>
+    <string name="accounts">Accounts</string>
+    <string name="menu_Profile">Profile</string>
+    <string name="menu_Login">Log in</string>
+    <string name="menu_logout">Log out</string>
+    <string name="menu_Groups">Groups</string>
+    <string name="menu_Shuffle">Rearrange tasks</string>
+    <dimen name="title_size">32sp</dimen>
+    <dimen name="support_text_size">16sp</dimen>
     <string name="title_activity_log_in">LogIn</string>
     <string name="prompt_email">Email</string>
     <string name="prompt_password">Password</string>
@@ -29,15 +29,15 @@
     <string name="action_sign_in_short">Sign in</string>
     <string name="welcome">"Welcome !"</string>
     <string name="login_failed">"Login failed"</string>
-	<string name="prompt_name">Input name</string>
-	<string name="prompt_desc">Input task description</string>
-	<string name="delete">Delete</string>
-	<string name="save">Save</string>
-	<string name="select_deadline_time">Select deadline date</string>
-	<string name="select_planned_time">Select planned date</string>
-	<string-array name="priority_options">
-		<item>High</item>
-		<item>Medium</item>
-		<item>Low</item>
-	</string-array>
+    <string name="prompt_name">Input name</string>
+    <string name="prompt_desc">Input task description</string>
+    <string name="delete">Delete</string>
+    <string name="save">Save</string>
+    <string name="select_deadline_time">Select deadline date</string>
+    <string name="select_planned_time">Select planned date</string>
+    <string-array name="priority_options">
+        <item>High</item>
+        <item>Medium</item>
+        <item>Low</item>
+    </string-array>
 </resources>

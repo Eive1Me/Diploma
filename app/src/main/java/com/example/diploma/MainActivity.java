@@ -85,6 +85,7 @@ import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -106,7 +107,6 @@ public class MainActivity extends AppCompatActivity {
     Button addTask = null;
     DrawerLayout drawerLayout;
     NavigationView navigationView;
-
     User currentUser = new User();
 
     @Override
@@ -128,14 +128,14 @@ public class MainActivity extends AppCompatActivity {
 
         FileInputStream fin = null;
         try {
-            fin = openFileInput("1.txt");
+            fin = openFileInput("profile.txt");
             byte[] bytes = new byte[fin.available()];
             fin.read(bytes);
             String[] text = (new String (bytes)).split(":");
             if (text.length == 3)
-                currentUser = new User(Long.getLong(text[0]), text[1], text[2]);
+                currentUser = new User(Long.parseLong(text[0]), text[1], text[2]);
         }
-        catch(IOException ex) {
+        catch(IOException | NullPointerException ex) {
             Toast.makeText(this, "Пожалуйста, войдите в систему.", Toast.LENGTH_SHORT).show();
         }
         finally{
@@ -477,7 +477,10 @@ public class MainActivity extends AppCompatActivity {
                     }
                 } );
             } else if (item.getTitle().equals("Profile")) {
-
+                Intent intent = new Intent(MainActivity.this, ProfileActivity.class);
+                intent.putExtra("UserName", currentUser.getLogin());
+                intent.putExtra("UserId", currentUser.getId());
+                startActivity(intent);
             }
             drawerLayout.closeDrawers();
             return true;
@@ -500,7 +503,6 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
         if (currentUser.getId() > 0)
             try {
-                System.out.println(1);
                 new GetDataFromURL().execute("http://192.168.3.7:8080/antiprocrastinate-api/v1/tasks/all/" + currentUser.getId());
             } catch (NullPointerException ignored){}
         monthCalendarView.updateMonthData();
@@ -619,38 +621,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         protected String doInBackground(String... strings) {
-            HttpURLConnection connection = null;
-            BufferedReader reader = null;
-
-            try {
-                URL url = new URL(strings[0]);
-                connection = (HttpURLConnection) url.openConnection();
-                connection.connect();
-
-                InputStream stream = connection.getInputStream();
-                reader = new BufferedReader(new InputStreamReader(stream));
-
-                StringBuilder buffer = new StringBuilder();
-                String line = "";
-
-                while ((line = reader.readLine()) != null) {
-                    buffer.append(line).append("\n");
-                }
-                return buffer.toString();
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                if (connection != null)
-                    connection.disconnect();
-                try {
-                    if (reader != null) {
-                        reader.close();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-            return null;
+            return Utils.backgroundTask(strings);
         }
 
         @Override

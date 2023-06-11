@@ -51,7 +51,7 @@ public class TaskAdapter extends ArrayAdapter<Task> {
         return convertView;
     }
 
-    private class ViewHolder {
+    private static class ViewHolder {
         //Чтобы не искать каждый раз по id, в случаях когда контент вью уже определён
         final TextView name;
         final TextView priority;

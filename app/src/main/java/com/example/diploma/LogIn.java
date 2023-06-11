@@ -93,7 +93,6 @@ public class LogIn extends AppCompatActivity {
                 FileOutputStream fos = null;
                 try {
                     String text = currentUser.getId() + ":" + currentUser.getLogin() + ":" + currentUser.getPassword();
-                    System.out.println(currentUser.getId());
                     fos = openFileOutput("profile.txt", MODE_PRIVATE);
                     fos.write(text.getBytes());
                 }

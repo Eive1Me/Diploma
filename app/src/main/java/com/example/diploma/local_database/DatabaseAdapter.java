@@ -4,7 +4,9 @@ import android.annotation.SuppressLint;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteConstraintException;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
 
 import com.example.diploma.Utils;
 import com.example.diploma.model.Category;
@@ -86,8 +88,17 @@ public class DatabaseAdapter {
             addPriority(task.getPriorityId());
         if (!isStatusExists(task.getStatusId().getId()))
             addStatus(task.getStatusId());
+        if (!isTaskExists(task.getId()))
+            database.insert("TASK_TABLE", null, values);
+    }
 
-        database.insert("TASK_TABLE", null, values);
+    private boolean isTaskExists(long taskId) {
+        Cursor cursor = database.query("TASK_TABLE", null, "id = ?", new String[]{String.valueOf(taskId)}, null, null, null);
+        boolean exists = cursor != null && cursor.moveToFirst();
+        if (cursor != null) {
+            cursor.close();
+        }
+        return exists;
     }
 
     @SuppressLint("Range")
@@ -177,7 +188,7 @@ public class DatabaseAdapter {
     }
 
     @SuppressLint("Range")
-    public Category getCategoryById(int categoryId) {
+    public Category getCategoryById(long categoryId) {
         Cursor cursor = database.query("CATEGORY_TABLE", null, "id = ?", new String[]{String.valueOf(categoryId)}, null, null, null);
         Category category = null;
         if (cursor != null && cursor.moveToFirst()) {
