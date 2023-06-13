@@ -111,7 +111,7 @@ public class DatabaseAdapter {
     }
 
     @SuppressLint("Range")
-    public Task getTaskById(int taskId) {
+    public Task getTaskById(long taskId) {
         Cursor cursor = database.query("TASK_TABLE", null, "id = ?", new String[]{String.valueOf(taskId)}, null, null, null);
         Task task = null;
         if (cursor != null && cursor.moveToFirst()) {

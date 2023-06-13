@@ -20,6 +20,7 @@
     <EditText
         android:id="@+id/desc"
         android:layout_width="0dp"
+        android:minHeight="48dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:hint="@string/prompt_desc"
@@ -27,15 +28,39 @@
         app:layout_constraintStart_toStartOf="@+id/name"
         app:layout_constraintTop_toBottomOf="@+id/name" />
 
+    <TextView
+        android:id="@+id/deadline_time"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:text="Current time"
+        android:textAppearance="@style/TextAppearance.AppCompat.Medium"
+        app:layout_constraintEnd_toEndOf="@+id/desc"
+        app:layout_constraintStart_toStartOf="@+id/desc"
+        app:layout_constraintTop_toBottomOf="@+id/desc" />
+
     <Button
         android:id="@+id/deadline_time_button"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:text="@string/select_deadline_time"
-        app:layout_constraintEnd_toEndOf="@+id/desc"
-        app:layout_constraintStart_toStartOf="@+id/desc"
-        app:layout_constraintTop_toBottomOf="@+id/desc" />
+        app:layout_constraintEnd_toEndOf="@+id/deadline_time"
+        app:layout_constraintStart_toStartOf="@+id/deadline_time"
+        app:layout_constraintTop_toBottomOf="@+id/deadline_time" />
+
+    <TextView
+        android:id="@+id/planned_time"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:text="Current time"
+        android:textAppearance="@style/TextAppearance.AppCompat.Medium"
+        app:layout_constraintEnd_toEndOf="@+id/deadline_time_button"
+        app:layout_constraintStart_toStartOf="@+id/deadline_time_button"
+        app:layout_constraintTop_toBottomOf="@+id/deadline_time_button" />
 
     <Button
         android:id="@+id/planned_time_button"
@@ -43,9 +68,9 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:text="@string/select_planned_time"
-        app:layout_constraintEnd_toEndOf="@+id/deadline_time_button"
-        app:layout_constraintStart_toStartOf="@+id/deadline_time_button"
-        app:layout_constraintTop_toBottomOf="@+id/deadline_time_button" />
+        app:layout_constraintEnd_toEndOf="@+id/planned_time"
+        app:layout_constraintStart_toStartOf="@+id/planned_time"
+        app:layout_constraintTop_toBottomOf="@+id/planned_time" />
 
     <Spinner
         android:id="@+id/priority_spinner"
@@ -98,5 +123,15 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toEndOf="@+id/save_button" />
+
+    <Switch
+        android:id="@+id/switch1"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:text="Task completed"
+        app:layout_constraintEnd_toEndOf="@+id/status_spinner"
+        app:layout_constraintStart_toStartOf="@+id/status_spinner"
+        app:layout_constraintTop_toBottomOf="@+id/status_spinner" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

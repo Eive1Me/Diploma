@@ -39,6 +39,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -80,6 +81,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.sql.SQLException;
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -97,7 +99,7 @@ import java.util.Objects;
 
 public class MainActivity extends AppCompatActivity {
 
-    private LocalDate selectedDate = null;
+    private Date selectedDate = null;
     CalendarView monthCalendarView = null;
     WeekCalendarView weekCalendarView = null;
     TextView month_day = null;
@@ -130,20 +132,19 @@ public class MainActivity extends AppCompatActivity {
         List<DayOfWeek> dayOfWeeks = daysOfWeek(DayOfWeek.MONDAY);
         int selectionDrawable = R.drawable.baseline_brightness_1_24;
 
+        /* Load data if it exists */
         FileInputStream fin = null;
         try {
             fin = openFileInput("profile.txt");
             byte[] bytes = new byte[fin.available()];
             fin.read(bytes);
-            String[] text = (new String (bytes)).split(":");
+            String[] text = (new String(bytes)).split(":");
             if (text.length == 3)
                 currentUser = new User(Long.parseLong(text[0]), text[1], text[2]);
-        }
-        catch(IOException | NullPointerException ex) {
+        } catch (IOException | NullPointerException ex) {
             Toast.makeText(this, "Пожалуйста, войдите в систему.", Toast.LENGTH_SHORT).show();
-        }
-        finally{
-            if(fin!=null) {
+        } finally {
+            if (fin != null) {
                 try {
                     fin.close();
                 } catch (IOException e) {
@@ -156,7 +157,8 @@ public class MainActivity extends AppCompatActivity {
         try {
             Long userId = arguments.getLong("UserId");
             currentUser.setId(userId);
-        } catch (NullPointerException ignored){}
+        } catch (NullPointerException ignored) {
+        }
 
         adapter = new DatabaseAdapter(this);
         adapter.open();
@@ -171,10 +173,11 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             taskList = newList;
-        } catch (SQLiteException ignored) {}
+        } catch (SQLiteException ignored) {
+        }
         adapter.close();
 
-        if (currentUser != null && currentUser.getLogin() != null && !currentUser.getLogin().isEmpty()){
+        if (currentUser != null && currentUser.getLogin() != null && !currentUser.getLogin().isEmpty()) {
             TextView textView = navigationView.getHeaderView(0).findViewById(R.id.header_title);
             textView.setText(currentUser.getLogin());
             navigationView.getMenu().findItem(R.id.nav_login).setVisible(false);
@@ -205,7 +208,7 @@ public class MainActivity extends AppCompatActivity {
                 List<Task> tasks = getTasksForDate(date);
 
                 if (calendarDay.getPosition() == DayPosition.MonthDate) {
-                    if (calendarDay.getDate().equals(selectedDate)) {
+                    if (Utils.compareLocalDateToDate(calendarDay.getDate(), selectedDate)) {
                         taskAdapter = new TaskAdapter(MainActivity.this, R.layout.list_layout, tasks);
                         taskViewList.setAdapter(taskAdapter);
                         container.textView.setTextColor(Color.WHITE);
@@ -219,6 +222,9 @@ public class MainActivity extends AppCompatActivity {
                     Map<Color, Integer> colormap = new HashMap<>();
                     for (Task task : tasks) {
                         Color taskColor = Color.valueOf(Color.parseColor(task.getCategoryId().getColour()));
+                        if (calendarDay.getPosition() != DayPosition.MonthDate) {
+                            taskColor = Color.valueOf(Color.argb(160, taskColor.red(), taskColor.green(), taskColor.blue()));
+                        }
                         if (!colormap.containsKey(taskColor))
                             colormap.put(taskColor, 1);
                         else
@@ -276,7 +282,7 @@ public class MainActivity extends AppCompatActivity {
                 container.setOnClickListener(weekCalendarView);
                 container.textView.setText(String.valueOf(weekDay.getDate().getDayOfMonth()));
                 if (weekDay.getPosition() == WeekDayPosition.RangeDate) {
-                    if (weekDay.getDate().equals(selectedDate)) {
+                    if (Utils.compareLocalDateToDate(weekDay.getDate(), selectedDate)) {
                         container.textView.setTextColor(Color.WHITE);
                         container.textView.setBackgroundResource(selectionDrawable);
                     } else {
@@ -391,7 +397,7 @@ public class MainActivity extends AppCompatActivity {
 
         /* Bottom Sheet Behavior */
         BottomSheetBehavior<FrameLayout> bsBehavior = BottomSheetBehavior.from(flBottomSheet);
-        bsBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback(){
+        bsBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
             @Override
             public void onStateChanged(@NonNull View bottomSheet, int newState) {
                 if (newState == BottomSheetBehavior.STATE_EXPANDED) {
@@ -401,7 +407,7 @@ public class MainActivity extends AppCompatActivity {
 
                     // Переместиться к выбранной дате в weekCalendarView
                     if (selectedDate != null) {
-                        weekCalendarView.scrollToWeek(selectedDate);
+                        weekCalendarView.scrollToWeek(Utils.convertToLocalDateViaInstant(selectedDate));
                     }
                 } else if (newState == BottomSheetBehavior.STATE_COLLAPSED || newState == BottomSheetBehavior.STATE_HIDDEN) {
                     // BottomSheet свернут или скрыт, показываем calendarView и скрываем weekCalendarView
@@ -410,7 +416,7 @@ public class MainActivity extends AppCompatActivity {
 
                     // Переместиться к выбранной дате в calendarView
                     if (selectedDate != null) {
-                        monthCalendarView.scrollToMonth(YearMonth.from(selectedDate));
+                        monthCalendarView.scrollToMonth(YearMonth.from(Utils.convertToLocalDateViaInstant(selectedDate)));
                     }
                 } else {
                     weekCalendarView.setVisibility(View.VISIBLE);
@@ -443,11 +449,14 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        /* Screen size adaptation */
         WindowManager windowManager = getWindowManager();
         Display display = windowManager.getDefaultDisplay();
         Point screenSize = new Point();
         display.getSize(screenSize);
         int screenHeight = screenSize.y;
+
+        /* Set bottom sheet content to the tasks on the according date */
         ViewTreeObserver monthCalendarViewObserver = monthCalendarView.getViewTreeObserver();
         monthCalendarViewObserver.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
             @Override
@@ -474,16 +483,29 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        selectedDate = LocalDate.now();
-        monthCalendarView.notifyDateChanged(selectedDate);
-        month_day.setText(Utils.prettyDate(selectedDate));
-        week_day.setText(selectedDate.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
+        taskViewList.setOnItemLongClickListener((adapterView, view, i, l) -> {
+            Task task = (Task) adapterView.getItemAtPosition(i);
+            if (task != null) {
+                Intent intent = new Intent(getApplicationContext(), TaskUpdate.class);
+                intent.putExtra("id", task.getId());
+                intent.putExtra("UserId", currentUser.getId());
+                startActivity(intent);
+            }
+            return false;
+        });
 
-        // Добавьте обработчик кликов по элементам меню
+        /* Set selected date to today */
+        selectedDate = Date.from(Instant.now());
+        LocalDate date = Utils.convertToLocalDateViaInstant(selectedDate);
+        monthCalendarView.notifyDateChanged(date);
+        month_day.setText(Utils.prettyDate(date));
+        week_day.setText(date.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
+
+        /* Menu navigation */
         navigationView.setNavigationItemSelectedListener(item -> {
             // Обработка выбора пунктов меню здесь
             // Можно добавить свою логику для каждого пункта меню
-            if (item.getTitle().equals("Log in")){
+            if (item.getTitle().equals("Log in")) {
                 Intent intent = new Intent(MainActivity.this, LogIn.class);
                 startActivity(intent);
             } else if (item.getTitle().equals("Log out")) {
@@ -508,22 +530,21 @@ public class MainActivity extends AppCompatActivity {
                     String text = "Это строка существует просто чтобы выдало ошибку парсинга, а Вы почему вообще её читаете?";
                     fos = openFileOutput("profile.txt", MODE_PRIVATE);
                     fos.write(text.getBytes());
-                }
-                catch(IOException ignored) {}
-                finally{
-                    try{
-                        if(fos!=null)
+                } catch (IOException ignored) {
+                } finally {
+                    try {
+                        if (fos != null)
                             fos.close();
+                    } catch (IOException ignored) {
                     }
-                    catch(IOException ignored){}
                 }
 
             } else if (item.getTitle().equals("Rearrange tasks")) {
                 taskList.forEach(task -> {
-                    if (task.getId() == 16) {
-                        task.setPlannedTime(Date.from(task.getPlannedTime().toInstant().plus(1, ChronoUnit.DAYS)));
+                    if (currentUser != null) {
+                        new GetRearrangedTasksDataFromURL().execute("http://192.168.3.7:8080/antiprocrastinate-api/v1/tasks/rearranged/" + currentUser.getId());
                     }
-                } );
+                });
             } else if (item.getTitle().equals("Profile")) {
                 if (currentUser != null && currentUser.getId() > 0) {
                     Intent intent = new Intent(MainActivity.this, ProfileActivity.class);
@@ -539,15 +560,18 @@ public class MainActivity extends AppCompatActivity {
             drawerLayout.closeDrawers();
             return true;
         });
-
         toggle = new ActionBarDrawerToggle(this, drawerLayout, 0, 0);
         drawerLayout.addDrawerListener(toggle);
         toggle.syncState();
 
     }
 
+    /* Add task activity */
     public void addTask(View view) {
         Intent intent = new Intent(MainActivity.this, TaskUpdate.class);
+        intent.putExtra("UserId", currentUser.getId());
+        intent.putExtra("DeadlineDate", Utils.parseDateToString(selectedDate));
+        intent.putExtra("PlannedDate", Utils.parseDateToString(selectedDate));
         startActivity(intent);
     }
 
@@ -557,8 +581,17 @@ public class MainActivity extends AppCompatActivity {
         try {
             if (currentUser != null && currentUser.getId() > 0)
                 new GetDataFromURL().execute("http://192.168.3.7:8080/antiprocrastinate-api/v1/tasks/all/" + currentUser.getId());
-        } catch (NullPointerException ignored){}
+        } catch (NullPointerException ignored) {
+        }
 
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        adapter.open();
+        taskList = adapter.getAllTasks();
+        adapter.close();
     }
 
     static class MonthViewContainer extends ViewContainer {
@@ -586,21 +619,21 @@ public class MainActivity extends AppCompatActivity {
         public void setOnClickListener(WeekCalendarView weekCalendarView) {
             view.setOnClickListener(v -> {
                 if (day.getPosition() == WeekDayPosition.RangeDate) {
-                    LocalDate currentSelection = selectedDate;
+                    LocalDate currentSelection = Utils.convertToLocalDateViaInstant(selectedDate);
                     if (currentSelection == day.getDate()) {
                         monthCalendarView.notifyDateChanged(currentSelection);
                         weekCalendarView.notifyDateChanged(currentSelection);
-                        selectedDate = LocalDate.now();
+                        selectedDate = Date.from(Instant.now());
                         month_day.setText(Utils.prettyDate(currentSelection));
                         week_day.setText(currentSelection.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
                         monthCalendarView.notifyDateChanged(currentSelection);
                         weekCalendarView.notifyDateChanged(currentSelection);
                     } else {
-                        selectedDate = day.getDate();
-                        month_day.setText(Utils.prettyDate(selectedDate));
-                        week_day.setText(selectedDate.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
-                        monthCalendarView.notifyDateChanged(selectedDate);
-                        weekCalendarView.notifyDateChanged(selectedDate);
+                        selectedDate = Utils.convertToDateViaInstant(day.getDate());
+                        month_day.setText(Utils.prettyDate(day.getDate()));
+                        week_day.setText(day.getDate().getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
+                        monthCalendarView.notifyDateChanged(day.getDate());
+                        weekCalendarView.notifyDateChanged(day.getDate());
                         if (currentSelection != null) {
                             monthCalendarView.notifyDateChanged(currentSelection);
                             weekCalendarView.notifyDateChanged(currentSelection);
@@ -627,21 +660,21 @@ public class MainActivity extends AppCompatActivity {
         public void setOnClickListener(CalendarView monthCalendarView) {
             view.setOnClickListener(v -> {
                 if (day.getPosition() == DayPosition.MonthDate) {
-                    LocalDate currentSelection = selectedDate;
+                    LocalDate currentSelection = Utils.convertToLocalDateViaInstant(selectedDate);
                     if (currentSelection == day.getDate()) {
                         monthCalendarView.notifyDateChanged(currentSelection);
                         weekCalendarView.notifyDateChanged(currentSelection);
-                        selectedDate = LocalDate.now();
+                        selectedDate = Date.from(Instant.now());
                         month_day.setText(Utils.prettyDate(currentSelection));
                         week_day.setText(currentSelection.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
                         monthCalendarView.notifyDateChanged(currentSelection);
                         weekCalendarView.notifyDateChanged(currentSelection);
                     } else {
-                        selectedDate = day.getDate();
-                        month_day.setText(Utils.prettyDate(selectedDate));
-                        week_day.setText(selectedDate.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
-                        monthCalendarView.notifyDateChanged(selectedDate);
-                        weekCalendarView.notifyDateChanged(selectedDate);
+                        selectedDate = Utils.convertToDateViaInstant(day.getDate());
+                        month_day.setText(Utils.prettyDate(day.getDate()));
+                        week_day.setText(day.getDate().getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.getDefault()));
+                        monthCalendarView.notifyDateChanged(day.getDate());
+                        weekCalendarView.notifyDateChanged(day.getDate());
                         if (currentSelection != null) {
                             monthCalendarView.notifyDateChanged(currentSelection);
                             weekCalendarView.notifyDateChanged(currentSelection);
@@ -657,9 +690,9 @@ public class MainActivity extends AppCompatActivity {
         for (Task task : taskList) {
             Date date1 = Date.from(date.atStartOfDay(ZoneId.systemDefault()).toInstant());
             if (task.getPlannedTime().getYear() == date1.getYear() &&
-                task.getPlannedTime().getMonth() == date1.getMonth() &&
-                task.getPlannedTime().getDate() == date1.getDate()
-            ){
+                    task.getPlannedTime().getMonth() == date1.getMonth() &&
+                    task.getPlannedTime().getDate() == date1.getDate()
+            ) {
                 tasksForDate.add(task);
             }
         }
@@ -685,15 +718,16 @@ public class MainActivity extends AppCompatActivity {
                 JSONArray array = new JSONArray(result);
                 for (int i = 0; i < array.length(); i++) {
                     JSONObject jsonTask = array.getJSONObject(i);
-                    if (currentUser.getLogin() == null){
+                    if (currentUser.getLogin() == null) {
                         currentUser = Utils.parseUserJsonObject(jsonTask.getJSONObject("userId"));
                     }
                     Task task = Utils.parseTaskJsonObject(jsonTask);
-                    if (!taskList.contains(task)){
+                    if (!taskList.contains(task)) {
                         taskList.add(task);
                         try {
                             adapter.addTask(task);
-                        } catch (SQLiteConstraintException ignored) {}
+                        } catch (SQLiteConstraintException ignored) {
+                        }
                     }
                 }
                 weekCalendarView.updateWeekData();
@@ -704,19 +738,65 @@ public class MainActivity extends AppCompatActivity {
                     String text = currentUser.getId() + ":" + currentUser.getLogin() + ":" + currentUser.getPassword();
                     fos = openFileOutput("profile.txt", MODE_PRIVATE);
                     fos.write(text.getBytes());
-                }
-                catch(IOException ex) {
+                } catch (IOException ex) {
                     Toast.makeText(MainActivity.this, ex.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-                finally{
-                    try{
-                        if(fos!=null)
+                } finally {
+                    try {
+                        if (fos != null)
                             fos.close();
-                    }
-                    catch(IOException ex){
+                    } catch (IOException ex) {
                         Toast.makeText(MainActivity.this, ex.getMessage(), Toast.LENGTH_SHORT).show();
                     }
                 }
+
+                for (Task task :
+                        taskList) {
+                    if (task.getUserId().getId() != currentUser.getId()) {
+                        adapter.deleteTask(task.getId());
+                    }
+                }
+                monthCalendarView.updateMonthData();
+                weekCalendarView.updateWeekData();
+                adapter.close();
+            } catch (JSONException | NullPointerException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private class GetRearrangedTasksDataFromURL extends AsyncTask<String, String, String> {
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
+
+        @Override
+        protected String doInBackground(String... strings) {
+            return Utils.backgroundTask(strings);
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+            try {
+                taskList.clear();
+                adapter.open();
+                JSONArray array = new JSONArray(result);
+                for (int i = 0; i < array.length(); i++) {
+                    JSONObject jsonTask = array.getJSONObject(i);
+                    if (currentUser.getLogin() == null) {
+                        currentUser = Utils.parseUserJsonObject(jsonTask.getJSONObject("userId"));
+                    }
+                    Task task = Utils.parseTaskJsonObject(jsonTask);
+                    if (!taskList.contains(task)) {
+                        taskList.add(task);
+                        try {
+                            adapter.addTask(task);
+                        } catch (SQLiteConstraintException ignored) {
+                        }
+                    }
+                }
+                weekCalendarView.updateWeekData();
+                monthCalendarView.updateMonthData();
 
                 for (Task task :
                         taskList) {

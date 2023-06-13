@@ -7,13 +7,16 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.Spinner;
+import android.widget.Switch;
 import android.widget.TextView;
 
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.diploma.local_database.DatabaseAdapter;
+import com.example.diploma.model.Task;
 import com.example.diploma.model.User;
 import com.github.florent37.singledateandtimepicker.dialog.DoubleDateAndTimePickerDialog;
 import com.github.florent37.singledateandtimepicker.dialog.SingleDateAndTimePickerDialog;
@@ -22,6 +25,14 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
@@ -30,33 +41,40 @@ import java.util.Locale;
 
 public class TaskUpdate extends AppCompatActivity {
     DatabaseAdapter dataAdapter;
-    private long userId=0;
+    private long taskId = 0;
     private TextView name;
-    private Button selectDeadlineTime;
-    private Button selectPlannedTime;
-    private TextView priority;
     private TextView desc;
-    private TextView deadline;
-    private TextView planned;
-    private TextView status;
-    private TextView category;
     private Button delButton;
     private Button saveButton;
     private Spinner prioritySpinner;
     private Spinner categorySpinner;
     private Spinner statusSpinner;
-    private LocalDate selectedDeadlineDate = LocalDate.now();
-    private LocalDate selectedPlannedDate = LocalDate.now();
-    String selectedPriority = "high";
-    String selectedStatus = "not started";
-    String selectedCategory = "work";
-    private LocalDate completeTime = null;
+    private TextView deadline;
+    private Button selectDeadlineTime;
+    private TextView planned;
+    private Button selectPlannedTime;
+    private Switch completed;
+    private String taskName;
+    private String taskDesc;
+    private Long userId = 0L;
+    private Date selectedDeadlineDate = Date.from(Instant.now());
+    private Date selectedPlannedDate = Date.from(Instant.now());
+    private Long selectedPriority = 2L;
+    private Long selectedStatus = 3L;
+    private Long selectedCategory = 1L;
+    private Date completeTime = null;
+    private Task task;
+    private final String reqUrl = "http://192.168.3.7:8080/antiprocrastinate-api/v1/tasks";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.task_update);
 
+        dataAdapter = new DatabaseAdapter(this);
+
+        name = findViewById(R.id.name);
+        desc = findViewById(R.id.desc);
         selectDeadlineTime = findViewById(R.id.deadline_time_button);
         selectPlannedTime = findViewById(R.id.planned_time_button);
         prioritySpinner = findViewById(R.id.priority_spinner);
@@ -64,13 +82,19 @@ public class TaskUpdate extends AppCompatActivity {
         statusSpinner = findViewById(R.id.status_spinner);
         delButton = findViewById(R.id.delete_button);
         saveButton = findViewById(R.id.save_button);
+        completed = findViewById(R.id.switch1);
+        deadline = findViewById(R.id.deadline_time);
+        planned = findViewById(R.id.planned_time);
 
         selectDeadlineTime.setOnClickListener(view -> new SingleDateAndTimePickerDialog.Builder(TaskUpdate.this)
                 .bottomSheet()
                 .minutesStep(15)
                 .curved()
                 .title("Select deadline date")
-                .listener(date -> selectedDeadlineDate = Utils.convertToLocalDateViaInstant(date))
+                .listener(date -> {
+                    selectedDeadlineDate = date;
+                    deadline.setText(Utils.getBeautifulDate(date));
+                })
                 .display()
         );
 
@@ -79,28 +103,27 @@ public class TaskUpdate extends AppCompatActivity {
                 .minutesStep(15)
                 .curved()
                 .title("Select planned date")
-                .listener(date -> selectedPlannedDate = Utils.convertToLocalDateViaInstant(date))
+                .listener(date -> {
+                    selectedPlannedDate = date;
+                    planned.setText(Utils.getBeautifulDate(date));
+                })
                 .display()
         );
 
-        // Создаем адаптер для списка вариантов приоритета
         ArrayAdapter<CharSequence> priorityAdapter = ArrayAdapter.createFromResource(this,
                 R.array.priority_options, android.R.layout.simple_spinner_item);
         priorityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
-        // Применяем адаптер к Spinner
         prioritySpinner.setAdapter(priorityAdapter);
 
-        // Обработка выбранного значения из Spinner
         prioritySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                selectedPriority = parent.getItemAtPosition(position).toString().toLowerCase(Locale.ROOT);
+                selectedPriority = (long) position + 1;
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
-                // Ничего не делаем
             }
         });
 
@@ -110,10 +133,12 @@ public class TaskUpdate extends AppCompatActivity {
 
         statusSpinner.setAdapter(statusAdapter);
 
+        statusSpinner.post(() -> statusSpinner.setSelection(2));
+
         statusSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                selectedCategory = parent.getItemAtPosition(position).toString().toLowerCase(Locale.ROOT);
+                selectedStatus = (long) position + 1;
             }
 
             @Override
@@ -130,7 +155,7 @@ public class TaskUpdate extends AppCompatActivity {
         categorySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                selectedStatus = parent.getItemAtPosition(position).toString().toLowerCase(Locale.ROOT);
+                selectedCategory = (long) position + 1;
             }
 
             @Override
@@ -138,61 +163,167 @@ public class TaskUpdate extends AppCompatActivity {
             }
         });
 
+        completed.setOnCheckedChangeListener((compoundButton, b) -> {
+            if (b) {
+                completeTime = Date.from(Instant.now());
+            } else {
+                completeTime = null;
+            }
+        });
+
+        String deadlineStr = null, plannedStr = null;
+
         Bundle extras = getIntent().getExtras();
         if (extras != null) {
-            userId = extras.getLong("id");
+            taskId = extras.getLong("id");
+            userId = extras.getLong("UserId");
+            deadlineStr = extras.getString("DeadlineDate");
+            plannedStr = extras.getString("PlannedDate");
         }
-        // если 0, то добавление
-        if (userId > 0) {
-            // получаем элемент по id из бд
+        if (deadline != null) {
+            selectedDeadlineDate = Utils.parseStringToDate(deadlineStr);
+            selectedPlannedDate = Utils.parseStringToDate(plannedStr);
+        }
+        if (taskId > 0) {
             dataAdapter.open();
-            User user = dataAdapter.getUserById(userId);
-            name.setText(extras.getString("name"));
-            desc.setText(extras.getString("desc"));
-            selectedDeadlineDate = Utils.convertToLocalDateViaInstant(Utils.parseStringToDate(extras.getString("deadline_time")));
-            selectedPlannedDate = Utils.convertToLocalDateViaInstant(Utils.parseStringToDate(extras.getString("planned_time")));
+            task = dataAdapter.getTaskById(taskId);
             dataAdapter.close();
+
+            name.setText(task.getName());
+            desc.setText(task.getDesc());
+
+            selectedDeadlineDate = task.getDeadlineTime();
+            selectedPlannedDate = task.getPlannedTime();
+
+            int statusId = (int) task.getStatusId().getId();
+            statusSpinner.post(() -> statusSpinner.setSelection(statusId - 1));
+            selectedStatus = task.getStatusId().getId();
+
+            int priorityId = (int) task.getPriorityId().getId();
+            prioritySpinner.setSelection(priorityId - 1);
+            selectedPriority = task.getPriorityId().getId();
+
+            int categoryId = (int) task.getCategoryId().getId();
+            categorySpinner.setSelection(categoryId - 1);
+            selectedCategory = task.getCategoryId().getId();
+
+            completed.setChecked(task.getCompleteTime() != null);
         } else {
-            // скрываем кнопку удаления
             delButton.setVisibility(View.GONE);
         }
 
+        deadline.setText(Utils.getBeautifulDate(selectedDeadlineDate));
+        planned.setText(Utils.getBeautifulDate(selectedPlannedDate));
+
         saveButton.setOnClickListener(view -> {
-//            Intent intent = new Intent(TaskUpdate.this, MainActivity.class);
-//            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-//            startActivity(intent);
+            //TODO check that it has a name
+            taskName = name.getText().toString();
+            taskDesc = desc.getText().toString();
+            String param = "";
+            if (taskId > 0) param = "/" + taskId;
+            new sendTaskFromURL().execute(reqUrl + param);
+        });
+
+        delButton.setOnClickListener(view -> {
+            String param = "";
+            if (taskId > 0) param = "/" + taskId;
+            new sendTaskFromURL().execute(reqUrl + param, "del");
+            dataAdapter.open();
+            dataAdapter.deleteTask(taskId);
+            dataAdapter.close();
         });
 
     }
 
-    private class GetUserAmountFromURL extends AsyncTask<String, String, String> {
-        String name;
+    private class sendTaskFromURL extends AsyncTask<String, String, String> {
         protected void onPreExecute() {
             super.onPreExecute();
         }
 
         @Override
         protected String doInBackground(String... strings) {
-            name = strings[1];
-            return Utils.backgroundTask(strings);
+            HttpURLConnection connection = null;
+            BufferedReader reader = null;
+
+            try {
+                URL url = new URL(strings[0]);
+                connection = (HttpURLConnection) url.openConnection();
+
+                // Создание тела запроса
+                JSONObject requestBodyJson = new JSONObject();
+
+                if (strings.length > 1 && (taskId > 0)) {
+                    connection.setRequestMethod("DELETE");
+                } else if (taskId > 0) {
+                    connection.setRequestMethod("PUT");
+                    requestBodyJson.put("id", taskId);
+                } else {
+                    connection.setRequestMethod("POST");
+                }
+
+                connection.setDoOutput(true); // Разрешить отправку данных
+
+                if (strings.length == 1) {
+
+                    requestBodyJson.put("userId", userId);
+                    requestBodyJson.put("name", taskName);
+                    requestBodyJson.put("categoryId", selectedCategory);
+                    requestBodyJson.put("priorityId", selectedPriority);
+                    requestBodyJson.put("statusId", selectedStatus);
+                    requestBodyJson.put("desc", taskDesc);
+                    requestBodyJson.put("plannedTime", Utils.parseDateToString(selectedPlannedDate));
+                    requestBodyJson.put("deadlineTime", Utils.parseDateToString(selectedDeadlineDate));
+                    requestBodyJson.put("completeTime", Utils.parseDateToString(completeTime));
+
+                    String requestBody = requestBodyJson.toString();
+
+                    // Установка типа контента и длины тела запроса
+                    connection.setRequestProperty("Content-Type", "application/json");
+                    connection.setRequestProperty("Content-Length", String.valueOf(requestBody.length()));
+
+                    connection.connect();
+
+                    // Отправка данных
+                    OutputStream outputStream = connection.getOutputStream();
+                    outputStream.write(requestBody.getBytes());
+                    outputStream.flush();
+
+                } else connection.connect();
+
+                InputStream stream = connection.getInputStream();
+                reader = new BufferedReader(new InputStreamReader(stream));
+
+                StringBuilder buffer = new StringBuilder();
+                String line = "";
+
+                while ((line = reader.readLine()) != null) {
+                    buffer.append(line).append("\n");
+                }
+                return buffer.toString();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
+            } finally {
+                if (connection != null)
+                    connection.disconnect();
+                try {
+                    if (reader != null) {
+                        reader.close();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            return null;
         }
 
         @Override
         protected void onPostExecute(String result) {
             super.onPostExecute(result);
-//            try {
-//                List<User> users = new ArrayList<>();
-//                JSONArray array = new JSONArray(result);
-//                for (int i = 0; i < array.length(); i++) {
-//                    JSONObject jsonUser = array.getJSONObject(i);
-//                    User user = Utils.parseUserJsonObject(jsonUser);
-//                    users.add(user);
-//                }
-//                grops.add(new ProfileActivity.Grop(name, users.size()));
-//                groupAdapter.notifyDataSetChanged();
-//            } catch (JSONException | NullPointerException e) {
-//                e.printStackTrace();
-//            }
+            Intent intent = new Intent(TaskUpdate.this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
         }
     }
 }

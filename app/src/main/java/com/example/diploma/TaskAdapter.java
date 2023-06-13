@@ -41,8 +41,16 @@ public class TaskAdapter extends ArrayAdapter<Task> {
         //Значения из полученного объекта
         viewHolder.name.setText(task.getName());
         viewHolder.status.setText(task.getStatusId().getValue());
-        viewHolder.planned.setText(String.valueOf("Planned: " + task.getPlannedTime().getHours() + ":" + task.getPlannedTime().getMinutes()));
-        viewHolder.deadline.setText(String.valueOf("Deadline: " + Utils.prettyDate(Utils.convertToLocalDateViaInstant(task.getDeadlineTime())) + " " + task.getDeadlineTime().getHours() + ":" + task.getDeadlineTime().getMinutes()));
+        String hours = String.valueOf(task.getPlannedTime().getHours());
+        if (hours.length() < 2) hours = "0" + hours;
+        String mins = String.valueOf(task.getPlannedTime().getMinutes());
+        if (mins.length() < 2) mins = "0" + mins;
+        viewHolder.planned.setText(String.valueOf("Planned: " + hours + ":" + mins));
+        String hours1 = String.valueOf(task.getDeadlineTime().getHours());
+        if (hours1.length() < 2) hours1 = "0" + hours1;
+        String mins1 = String.valueOf(task.getDeadlineTime().getMinutes());
+        if (mins1.length() < 2) mins1 = "0" + mins1;
+        viewHolder.deadline.setText(String.valueOf("Deadline: " + Utils.prettyDate(Utils.convertToLocalDateViaInstant(task.getDeadlineTime())) + " " + hours1 + ":" + mins1));
         viewHolder.priority.setText(task.getPriorityId().getValue());
         viewHolder.desc.setText(task.getDesc());
         viewHolder.category.setText(task.getCategoryId().getName());

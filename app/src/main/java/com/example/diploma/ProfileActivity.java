@@ -175,7 +175,7 @@ public class ProfileActivity extends AppCompatActivity {
         for (Long cat : categories.keySet()) {
             int[] nums = categories.get(cat);
             Category category = adapter.getCategoryById(cat);
-            categs.add(new Categ(category.getName(), (double) nums[1]/(nums[0] + nums[1]) * 100, category.getColour()));
+            categs.add(new Categ(category.getName(), (double) nums[0]/(nums[0] + nums[1]) * 100, category.getColour()));
         }
 
         adapter.close();

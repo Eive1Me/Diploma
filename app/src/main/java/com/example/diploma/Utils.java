@@ -19,6 +19,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.Date;
 import java.util.Locale;
@@ -98,6 +99,32 @@ public class Utils {
         return format.format(date);
     }
 
+    public static boolean compareLocalDateToDate(LocalDate d1, Date d2) {
+        return ((d1.getYear() == d2.getYear() + 1900) && (d1.getMonth().getValue() == d2.getMonth() + 1) && (d1.getDayOfMonth() == d2.getDate()));
+    }
+
+    public static String getBeautifulDate(Date date) {
+        String dateBeautiful = "";
+        if (Utils.compareLocalDateToDate(LocalDate.now(),date)) {
+            dateBeautiful += "Today ";
+        } else if ((LocalDate.now().getYear() == date.getYear() + 1900) &&
+                (LocalDate.now().getMonth().getValue() == date.getMonth() + 1) &&
+                (LocalDate.now().getDayOfMonth() == date.getDate() - 1)) {
+            dateBeautiful += "Tomorrow ";
+        } else if ((LocalDate.now().getYear() == date.getYear() + 1900) &&
+                (LocalDate.now().getMonth().getValue() == date.getMonth() + 1) &&
+                (LocalDate.now().getDayOfMonth() == date.getDate() + 1)) {
+            dateBeautiful += "Yesterday ";
+        } else {
+            dateBeautiful += Utils.prettyDate(Utils.convertToLocalDateViaInstant(date)) + " ";
+        }
+        String hours = String.valueOf(date.getHours());
+        if (hours.length() < 2) hours = "0" + hours;
+        String mins = String.valueOf(date.getMinutes());
+        if (mins.length() < 2) mins = "0" + mins;
+        return dateBeautiful + hours + ":" + mins;
+    }
+
     public static float calculateAlpha(int viewTop, int maxHeight) {
         // В этом примере, я просто использую линейную интерполяцию, чтобы прозрачность изменялась равномерно в зависимости от положения представления.
         float alphaPercentage = (float) viewTop / maxHeight;
@@ -109,12 +136,14 @@ public class Utils {
     }
 
     public static LocalDate convertToLocalDateViaInstant(Date dateToConvert) {
+        if (dateToConvert == null) return null;
         return dateToConvert.toInstant()
                 .atZone(ZoneId.systemDefault())
                 .toLocalDate();
     }
 
     public static Date convertToDateViaInstant(LocalDate dateToConvert) {
+        if (dateToConvert == null) return null;
         return java.util.Date.from(dateToConvert.atStartOfDay()
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
